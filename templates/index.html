@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тренажер португальского</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: #f4f4f9; padding: 20px; }
+        .card-box { background: white; max-width: 500px; margin: 50px auto; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .pt-text { font-size: 24px; font-weight: bold; margin-bottom: 20px; color: #333; }
+        .ru-text { font-size: 20px; font-style: italic; color: blue; margin-bottom: 30px; min-height: 30px; }
+        .timer { font-size: 18px; color: darkred; font-weight: bold; margin-bottom: 10px; }
+        .progress { color: gray; font-size: 14px; margin-bottom: 20px; }
+        button { font-size: 16px; padding: 10px 20px; margin: 10px; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-main { background: #007bff; color: white; }
+        .btn-know { background: #28a745; color: white; font-weight: bold; }
+        .btn-dont { background: #dc3545; color: white; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="card-box">
+    <div id="progress" class="progress">Нажмите «Старт» для начала</div>
+    <div id="timer" class="timer">⏱ Время: 10</div>
+    <div id="pt-text" class="pt-text">🇵🇹 Нажмите кнопку ниже</div>
+    <div id="ru-text" class="ru-text"></div>
+    <div id="buttons">
+        <button class="btn-main" onclick="getCard('')">Старт / Сброс</button>
+    </div>
+</div>
+
+<script>
+let currentRu = "";
+let timerInterval = null;
+let timeLeft = 10;
+
+function speak(text) {
+    // Озвучка через встроенный в любой браузер синтез речи (работает везде без gTTS!)
+    let utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'pt-PT'; // Европейский португальский акцент
+    window.speechSynthesis.speak(utterance);
+}
+
+function startTimer() {
+    clearInterval(timerInterval);
+    timeLeft = 10;
+    document.getElementById("timer").innerText = `⏱ Время: ${timeLeft}`;
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        if (timeLeft >= 0) {
+            document.getElementById("timer").innerText = `⏱ Время: ${timeLeft}`;
+        } else {
+            clearInterval(timerInterval);
+            document.getElementById("timer").innerText = "⏱ Время вышло!";
+            revealTranslation();
+        }
+    }, 1000);
+}
+
+function getCard(status) {
+    clearInterval(timerInterval);
+    fetch('/next_card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: status })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.finished) {
+            document.getElementById("progress").innerText = "Осталось карточек: 0";
+            document.getElementById("pt-text").innerText = "🎉 Отличная работа!";
+            document.getElementById("ru-text").innerText = "Вы выучили все слова сессии.";
+            document.getElementById("buttons").innerHTML = `<button class="btn-main" onclick="getCard('')">Повторить сессию</button>`;
+            return;
+        }
+        
+        document.getElementById("progress").innerText = `Осталось карточек: ${data.remaining}`;
+        document.getElementById("pt-text").innerText = data.pt;
+        document.getElementById("ru-text").innerText = "";
+        currentRu = data.ru;
+        
+        speak(data.pt);
+        startTimer();
+        
+        document.getElementById("buttons").innerHTML = `<button class="btn-main" onclick="revealTranslation()">Показать перевод (Enter)</button>`;
+    });
+}
+
+function revealTranslation() {
+    clearInterval(timerInterval);
+    document.getElementById("ru-text").innerText = currentRu;
+    document.getElementById("buttons").innerHTML = `
+        <button class="btn-know" onclick="getCard('know')">✔ Знаю (Enter)</button>
+        <button class="btn-dont" onclick="getCard('dont_know')">❌ Не знаю</button>
+    `;
+}
+
+// Привязка клавиши Enter для удобства
+document.addEventListener("keydown", function(event) {
+    if (event.key === "Enter") {
+        let buttons = document.getElementById("buttons").getElementsByTagName("button");
+        if (buttons.length > 0) {
+            buttons[0].click(); // Кликает по первой доступной кнопке (Показать или Знаю)
+        }
+    }
+});
+</script>
+</body>
+</html>
