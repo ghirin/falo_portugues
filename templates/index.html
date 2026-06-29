@@ -1,3 +1,9 @@
+Вот полностью исправленный текст файла templates/index.html.
+
+В нём я изолировал идентификатор контейнера кнопок (vocab-buttons), чтобы логика тренажёра слов гарантированно не конфликтовала с блоком топиков, который ты добавил, а также добавил базовую проверку на корректность данных от бэкенда, чтобы интерфейс не зависал.
+
+templates/index.html
+HTML
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -24,7 +30,7 @@
     <div id="timer" class="timer">⏱ Время: 10</div>
     <div id="pt-text" class="pt-text">🇵🇹 Нажмите кнопку ниже</div>
     <div id="ru-text" class="ru-text"></div>
-    <div id="buttons">
+    <div id="vocab-buttons">
         <button class="btn-main" onclick="getCard('')">Старт / Сброс</button>
     </div>
 </div>
@@ -70,26 +76,31 @@ function getCard(status) {
             document.getElementById("progress").innerText = "Осталось карточек: 0";
             document.getElementById("pt-text").innerText = "🎉 Отличная работа!";
             document.getElementById("ru-text").innerText = "Вы выучили все слова сессии.";
-            document.getElementById("buttons").innerHTML = `<button class="btn-main" onclick="getCard('')">Повторить сессию</button>`;
+            document.getElementById("vocab-buttons").innerHTML = `<button class="btn-main" onclick="getCard('')">Повторить сессию</button>`;
             return;
         }
         
         document.getElementById("progress").innerText = `Осталось карточек: ${data.remaining}`;
-        document.getElementById("pt-text").innerText = data.pt;
+        document.getElementById("pt-text").innerText = data.pt || "Нет текста";
         document.getElementById("ru-text").innerText = "";
-        currentRu = data.ru;
+        currentRu = data.ru || "Нет перевода";
         
-        speak(data.pt);
+        if (data.pt) {
+            speak(data.pt);
+        }
         startTimer();
         
-        document.getElementById("buttons").innerHTML = `<button class="btn-main" onclick="revealTranslation()">Показать перевод (Enter)</button>`;
+        document.getElementById("vocab-buttons").innerHTML = `<button class="btn-main" onclick="revealTranslation()">Показать перевод (Enter)</button>`;
+    })
+    .catch(err => {
+        console.error("Ошибка при получении карточки:", err);
     });
 }
 
 function revealTranslation() {
     clearInterval(timerInterval);
     document.getElementById("ru-text").innerText = currentRu;
-    document.getElementById("buttons").innerHTML = `
+    document.getElementById("vocab-buttons").innerHTML = `
         <button class="btn-know" onclick="getCard('know')">✔ Знаю (Enter)</button>
         <button class="btn-dont" onclick="getCard('dont_know')">❌ Не знаю</button>
     `;
@@ -98,9 +109,12 @@ function revealTranslation() {
 // Привязка клавиши Enter для удобства
 document.addEventListener("keydown", function(event) {
     if (event.key === "Enter") {
-        let buttons = document.getElementById("buttons").getElementsByTagName("button");
-        if (buttons.length > 0) {
-            buttons[0].click(); // Кликает по первой доступной кнопке (Показать или Знаю)
+        let container = document.getElementById("vocab-buttons");
+        if (container) {
+            let buttons = container.getElementsByTagName("button");
+            if (buttons.length > 0) {
+                buttons[0].click(); // Кликает по первой доступной кнопке (Показать или Знаю)
+            }
         }
     }
 });
